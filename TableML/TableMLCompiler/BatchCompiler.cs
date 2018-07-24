@@ -114,6 +114,59 @@ namespace TableML.Compiler
 			// make unity compile
 			//AssetDatabase.Refresh();
 		}
+
+        void GenerateLuaCode(string luaFilePath, string compileFilePath, string bundlesFilePath, string nameSpace, List<Hash> files)
+        {
+            string dstPath = luaFilePath + "TableFileRow.lua";
+            string dstPath1 = luaFilePath + "TableFile.lua";
+
+            if(!Directory.Exists(luaFilePath)){
+                Directory.CreateDirectory(luaFilePath);
+            }
+
+            File.WriteAllText(dstPath, LuaDefaultTemplate.FileTableFileRow);
+            File.WriteAllText(dstPath1, LuaDefaultTemplate.FileTableFile);
+
+            var codeTemplates = new Dictionary<string, string>()
+            {
+                {LuaDefaultTemplate.LuaGenCodeTemplate, "Product/Lua/Setting/AppSettings.lua"},
+            };
+
+            foreach (var kv in codeTemplates)
+            {
+                var templateStr = kv.Key;
+                var exportPath = kv.Value;
+
+                // 生成代码
+                var template = Template.Parse(templateStr);
+                var topHash = new Hash();
+                topHash["BundlesPath"] = bundlesFilePath;
+                topHash["CompilePath"] = compileFilePath;
+                topHash["Files"] = files;
+
+                if (!string.IsNullOrEmpty(exportPath))
+                {
+                    var genCode = template.Render(topHash);
+                    if (File.Exists(exportPath)) // 存在，比较是否相同
+                    {
+                        if (File.ReadAllText(exportPath) != genCode)
+                        {
+                            //EditorUtility.ClearProgressBar();
+                            // 不同，会触发编译，强制停止Unity后再继续写入
+                            //if (EditorApplication.isPlaying)
+                            {
+                                Console.WriteLine("[CAUTION]AppSettings code modified! Force stop Unity playing");
+                                //EditorApplication.isPlaying = false;
+                            }
+                            File.WriteAllText(exportPath, genCode);
+                        }
+                    }
+                    else
+                        File.WriteAllText(exportPath, genCode);
+
+                }
+            }
+        }
 		/// <summary>
 		/// Compile one directory 's all settings, and return behaivour results
 		/// </summary>
@@ -123,8 +176,12 @@ namespace TableML.Compiler
 		/// <param name="changeExtension"></param>
 		/// <param name="forceAll">no diff! only force compile will generate code</param>
 		/// <returns></returns>
+        ///
+        //public List<TableCompileResult> CompileTableMLAll(string sourcePath, string compilePath,
+                                                  //string genCodeFilePath, string genCodeTemplateString = null, string nameSpace = "AppSettings", string changeExtension = ".tml", string settingCodeIgnorePattern = null, bool forceAll = false)
+
 		public List<TableCompileResult> CompileTableMLAll(string sourcePath, string compilePath, 
-		                                                  string genCodeFilePath, string genCodeTemplateString = null, string nameSpace = "AppSettings", string changeExtension = ".tml", string settingCodeIgnorePattern = null, bool forceAll = false)
+		                                                  string bundlesFilePath, string luaFilePath, string nameSpace = "AppSettings", string changeExtension = ".tml", string settingCodeIgnorePattern = null, bool forceAll = false)
 		{
 			var results = new List<TableCompileResult>();
 			var compileBaseDir = compilePath;
@@ -262,11 +319,12 @@ namespace TableML.Compiler
 					}
 
 
-				    if (forceAll)
-				    {
+                    if (forceAll)
+                    {
                         // force 才进行代码编译
-                        GenerateCode(genCodeTemplateString, genCodeFilePath, nameSpace, templateHashes);
-				    }
+                        //GenerateCode(genCodeTemplateString, genCodeFilePath, nameSpace, templateHashes);
+                        GenerateLuaCode(luaFilePath, compilePath,bundlesFilePath, nameSpace, templateHashes);
+                    }
 				}
 
 			}
